@@ -19,6 +19,10 @@ import matplotlib.pyplot as plt
 from sklearn import datasets, svm, metrics
 from sklearn.model_selection import train_test_split
 
+from skimage import data, color
+from skimage.transform import rescale
+import numpy as np
+
 ###############################################################################
 # Digits dataset
 # --------------
@@ -58,45 +62,61 @@ for ax, image, label in zip(axes, digits.images, digits.target):
 
 # flatten the images
 n_samples = len(digits.images)
-data = digits.images.reshape((n_samples, -1))
+print("Image size is:")
+print(digits.images[0].shape)
 
-# Create a classifier: a support vector classifier
-clf = svm.SVC(gamma=0.001)
+rescale_factors = [0.5, 1, 2]
+test_sizes = [0.1, 0.2, 0.3, 0.4]
+for rescale_factor in rescale_factors:
+    for test_size in test_sizes:
+        resized_images=[]
+        for d  in digits.images:
+            resized_images.append(rescale(d, rescale_factor, anti_aliasing=False))
 
-# Split data into 50% train and 50% test subsets
-X_train, X_test, y_train, y_test = train_test_split(
-    data, digits.target, test_size=0.5, shuffle=False)
+        resized_images = np.array(resized_images)
+        data = resized_images.reshape((n_samples, -1))
 
-# Learn the digits on the train subset
-clf.fit(X_train, y_train)
+        # Create a classifier: a support vector classifier
+        clf = svm.SVC(gamma=0.001)
 
-# Predict the value of the digit on the test subset
-predicted = clf.predict(X_test)
+        # Split data into 50% train and 50% test subsets
+        X_train, X_test, y_train, y_test = train_test_split(
+            data, digits.target, test_size=test_size, shuffle=False)
 
-###############################################################################
-# Below we visualize the first 4 test samples and show their predicted
-# digit value in the title.
+        # Learn the digits on the train subset
+        clf.fit(X_train, y_train)
 
-_, axes = plt.subplots(nrows=1, ncols=4, figsize=(10, 3))
-for ax, image, prediction in zip(axes, X_test, predicted):
-    ax.set_axis_off()
-    image = image.reshape(8, 8)
-    ax.imshow(image, cmap=plt.cm.gray_r, interpolation='nearest')
-    ax.set_title(f'Prediction: {prediction}')
+        # Predict the value of the digit on the test subset
+        predicted = clf.predict(X_test)
 
-###############################################################################
-# :func:`~sklearn.metrics.classification_report` builds a text report showing
-# the main classification metrics.
+        ###############################################################################
+        # Below we visualize the first 4 test samples and show their predicted
+        # digit value in the title.
 
-print(f"Classification report for classifier {clf}:\n"
-      f"{metrics.classification_report(y_test, predicted)}\n")
+        _, axes = plt.subplots(nrows=1, ncols=4, figsize=(10, 3))
+        for ax, image, prediction in zip(axes, X_test, predicted):
+            ax.set_axis_off()
+            image = image.reshape(resized_images[0].shape)
+            ax.imshow(image, cmap=plt.cm.gray_r, interpolation='nearest')
+            ax.set_title(f'Prediction: {prediction}')
 
-###############################################################################
-# We can also plot a :ref:`confusion matrix <confusion_matrix>` of the
-# true digit values and the predicted digit values.
+        ###############################################################################
+        # :func:`~sklearn.metrics.classification_report` builds a text report showing
+        # the main classification metrics.
 
-disp = metrics.plot_confusion_matrix(clf, X_test, y_test)
-disp.figure_.suptitle("Confusion Matrix")
-print(f"Confusion matrix:\n{disp.confusion_matrix}")
+        # print(f"Classification report for classifier {clf}:\n"
+        #     f"{metrics.classification_report(y_test, predicted)}\n")
 
-plt.show()
+        ###############################################################################
+        # We can also plot a :ref:`confusion matrix <confusion_matrix>` of the
+        # true digit values and the predicted digit values.
+
+        disp = metrics.plot_confusion_matrix(clf, X_test, y_test)
+        disp.figure_.suptitle("Confusion Matrix")
+        # print(f"Confusion matrix:\n{disp.confusion_matrix}")
+
+        acc = metrics.accuracy_score(y_pred=predicted, y_true=y_test)
+        f1 = metrics.f1_score(y_pred=predicted, y_true=y_test, average='macro')
+        print("{}x{}\t{}:{}\t{}\t{}".format(resized_images[0].shape[0], resized_images[0].shape[1], (1-test_size)*100,test_size*100, acc,f1))
+
+        # plt.show()
