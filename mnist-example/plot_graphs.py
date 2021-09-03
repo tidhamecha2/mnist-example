@@ -68,10 +68,11 @@ print(digits.images[0].shape)
 rescale_factors = [0.5, 1, 2]
 test_sizes = [0.1, 0.2, 0.3, 0.4]
 for rescale_factor in rescale_factors:
+    resized_images=[]
+    for d  in digits.images:
+        resized_images.append(rescale(d, rescale_factor, anti_aliasing=False))
     for test_size in test_sizes:
-        resized_images=[]
-        for d  in digits.images:
-            resized_images.append(rescale(d, rescale_factor, anti_aliasing=False))
+        
 
         resized_images = np.array(resized_images)
         data = resized_images.reshape((n_samples, -1))
@@ -119,4 +120,4 @@ for rescale_factor in rescale_factors:
         f1 = metrics.f1_score(y_pred=predicted, y_true=y_test, average='macro')
         print("{}x{}\t{}:{}\t{}\t{}".format(resized_images[0].shape[0], resized_images[0].shape[1], (1-test_size)*100,test_size*100, acc,f1))
 
-        # plt.show()
+        plt.show()
