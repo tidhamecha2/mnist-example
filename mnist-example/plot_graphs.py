@@ -12,6 +12,7 @@ print(__doc__)
 # Author: Gael Varoquaux <gael dot varoquaux at normalesup dot org>
 # License: BSD 3 clause
 
+import os
 # Standard scientific Python imports
 import matplotlib.pyplot as plt
 
@@ -22,6 +23,8 @@ from sklearn.model_selection import train_test_split
 from skimage import data, color
 from skimage.transform import rescale
 import numpy as np
+
+from joblib import dump, load
 
 ###############################################################################
 # Digits dataset
@@ -57,9 +60,9 @@ digits = datasets.load_digits()
 # flatten the images
 n_samples = len(digits.images)
 
-rescale_factors = [0.25, 0.5, 1, 2, 3]
-
-for test_size, valid_size in [(0.15, 0.15), (0.20, 0.10)]:
+# rescale_factors = [0.25, 0.5, 1, 2, 3]
+rescale_factors = [1]
+for test_size, valid_size in [(0.15, 0.15)]:
     for rescale_factor in rescale_factors:
         model_candidates = []
         for gamma in [10 ** exponent for exponent in range(-7, 0)]:
@@ -93,19 +96,35 @@ for test_size, valid_size in [(0.15, 0.15), (0.20, 0.10)]:
             f1_valid = metrics.f1_score(
                 y_pred=predicted_valid, y_true=y_valid, average="macro"
             )
+
+            # we will ensure to throw away some of the models that yield random-like performance.
+            if acc_valid < 0.11:
+                print("Skipping for {}".format(gamma))
+                continue
+
             candidate = {
-                "model": clf,
                 "acc_valid": acc_valid,
                 "f1_valid": f1_valid,
                 "gamma": gamma,
             }
             model_candidates.append(candidate)
+            output_folder = "./models/tt_{}_val_{}_rescale_{}_gamma_{}".format(
+                test_size, valid_size, rescale_factor, gamma
+            )
+            os.mkdir(output_folder)
+            dump(clf, os.path.join(output_folder,"model.joblib"))
+
+            
         # Predict the value of the digit on the test subset
 
         max_valid_f1_model_candidate = max(
             model_candidates, key=lambda x: x["f1_valid"]
         )
-        predicted = max_valid_f1_model_candidate["model"].predict(X_test)
+        best_model_folder="./models/tt_{}_val_{}_rescale_{}_gamma_{}".format(
+                test_size, valid_size, rescale_factor, max_valid_f1_model_candidate['gamma']
+            )
+        clf = load(os.path.join(best_model_folder,"model.joblib"))
+        predicted = clf.predict(X_test)
 
         acc = metrics.accuracy_score(y_pred=predicted, y_true=y_test)
         f1 = metrics.f1_score(y_pred=predicted, y_true=y_test, average="macro")
