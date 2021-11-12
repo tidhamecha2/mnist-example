@@ -26,8 +26,9 @@ import numpy as np
 
 from joblib import dump, load
 
-from utils import preprocess, create_splits, test
+import pdb
 
+from utils import preprocess, create_splits, test_model, run_classification_experiment
 
 ###############################################################################
 # Digits dataset
@@ -63,6 +64,7 @@ digits = datasets.load_digits()
 # flatten the images
 n_samples = len(digits.images)
 
+classifier = svm.SVC
 # rescale_factors = [0.25, 0.5, 1, 2, 3]
 rescale_factors = [1]
 for test_size, valid_size in [(0.15, 0.15)]:
@@ -75,36 +77,24 @@ for test_size, valid_size in [(0.15, 0.15)]:
             resized_images = np.array(resized_images)
             data = resized_images.reshape((n_samples, -1))
 
-            # Create a classifier: a support vector classifier
-            clf = svm.SVC(gamma=gamma)
             X_train, X_test, X_valid, y_train, y_test, y_valid = create_splits(
                 data, digits.target, test_size, valid_size
             )
 
-            # print("Number of samples: Train:Valid:Test = {}:{}:{}".format(len(y_train),len(y_valid),len(y_test)))
-
-            # Learn the digits on the train subset
-            clf.fit(X_train, y_train)
-            metrics_valid = test(clf, X_valid, y_valid)
-            
-            # we will ensure to throw away some of the models that yield random-like performance.
-            if metrics_valid['acc'] < 0.11:
-                print("Skipping for {}".format(gamma))
-                continue
-
-            candidate = {
-                "acc_valid": metrics_valid['acc'],
-                "f1_valid": metrics_valid['f1'],
-                "gamma": gamma,
-            }
-            model_candidates.append(candidate)
             output_folder = "./models/tt_{}_val_{}_rescale_{}_gamma_{}".format(
-                test_size, valid_size, rescale_factor, gamma
+                test_size, valid_size, rescale_factor, gamma,
             )
-            os.mkdir(output_folder)
-            dump(clf, os.path.join(output_folder, "model.joblib"))
-
-        # Predict the value of the digit on the test subset
+            output_model_file = os.path.join(output_folder, "model.joblib")
+            metrics_valid = run_classification_experiment(
+                classifier, X_train, y_train, X_valid, y_valid, gamma, output_model_file
+            )
+            if metrics_valid:
+                candidate = {
+                    "acc_valid": metrics_valid["acc"],
+                    "f1_valid": metrics_valid["f1"],
+                    "gamma": gamma,
+                }
+                model_candidates.append(candidate)
 
         max_valid_f1_model_candidate = max(
             model_candidates, key=lambda x: x["f1_valid"]
@@ -112,9 +102,9 @@ for test_size, valid_size in [(0.15, 0.15)]:
         best_model_folder = "./models/tt_{}_val_{}_rescale_{}_gamma_{}".format(
             test_size, valid_size, rescale_factor, max_valid_f1_model_candidate["gamma"]
         )
-        clf = load(os.path.join(best_model_folder, "model.joblib"))
+        best_model_path = os.path.join(best_model_folder, "model.joblib")
+        metrics = test_model(best_model_path, X_test, y_test)
 
-        metrics = test(clf, X_test, y_test)
         print(
             "{}x{}\t{}\t{}:{}\t{:.3f}\t{:.3f}".format(
                 resized_images[0].shape[0],
@@ -122,7 +112,7 @@ for test_size, valid_size in [(0.15, 0.15)]:
                 max_valid_f1_model_candidate["gamma"],
                 (1 - test_size) * 100,
                 test_size * 100,
-                metrics['acc'],
-                metrics['f1'],
+                metrics["acc"],
+                metrics["f1"],
             )
         )
