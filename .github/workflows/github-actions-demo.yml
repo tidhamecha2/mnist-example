@@ -17,7 +17,7 @@ jobs:
       - name: List files in the repository
         run: |
           ls -r ${{ github.workspace }}
-      - run: echo "🍏 This job's status is ${{ job.status }}.
+      - run: echo "🍏 This job's status is ${{ job.status }}."
       - name: Install dep
         run:  pip3 install --no-cache-dir -r requirements.txt
       - name: Run test cases
